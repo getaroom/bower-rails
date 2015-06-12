@@ -62,4 +62,5 @@ module BowerRails
   @clean_before_precompile      = false
   @use_bower_install_deployment = false
   @force_install = false
+  @bower_components_directory   = 'bower_components'
 end

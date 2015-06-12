@@ -78,7 +78,7 @@ module BowerRails
 
     def generate_dotbowerrc
       contents = JSON.parse(File.read(File.join(root_path, '.bowerrc'))) rescue {}
-      contents["directory"] = "bower_components"
+      contents["directory"] = BowerRails.bower_components_directory
       JSON.pretty_generate(contents)
     end
 
