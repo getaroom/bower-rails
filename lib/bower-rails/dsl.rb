@@ -7,7 +7,13 @@ module BowerRails
     DEFAULT_DEPENDENCY_GROUP = :dependencies
 
     def self.evalute(root_path, filename)
-      new(root_path).tap { |dsl| dsl.eval_file(File.join(root_path, filename)) }
+      new(root_path).tap do |dsl|
+        dsl.send(eval_file_method, File.join(root_path, filename))
+      end
+    end
+
+    def self.eval_file_method
+      BowerRails.use_gem_deps_for_bowerfile ? :eval_file_with_deps : :eval_file
     end
 
     attr_reader :dependencies, :root_path
@@ -20,6 +26,7 @@ module BowerRails
       @resolutions = {}
       @assets_path ||= "assets"
       @main_files = {}
+      @current_group = nil
     end
 
     def asset(name, *args, &block)
@@ -67,7 +74,15 @@ module BowerRails
     end
 
     def eval_file(file)
-      instance_eval(File.open(file, "rb") { |f| f.read }, file.to_s)
+      instance_eval(File.open(file, 'rb') { |f| f.read }, file.to_s)
+    end
+
+    def eval_file_with_deps(file)
+      Gem::Specification.map do |dep|
+        bowerfile_in_dep = File.join(dep.gem_dir, 'Bowerfile')
+        eval_file(bowerfile_in_dep) if bowerfile_in_dep != file && File.exist?(bowerfile_in_dep)
+      end
+      eval_file(file)
     end
 
     def final_assets_path
@@ -120,6 +135,7 @@ module BowerRails
         normalized_group_path = normalize_location_path(group.first, group_assets_path(group))
         File.open(File.join(normalized_group_path, ".bowerrc"), "w") do |f|
           f.write(generate_dotbowerrc)
+          f.write("\n")
         end
       end
     end
@@ -187,7 +203,7 @@ module BowerRails
     #
     def dependencies_to_json(data)
       JSON.pretty_generate({
-        :name => "dsl-generated dependencies"
+        :name => "dsl-generated-dependencies"
       }.merge(data))
     end
 

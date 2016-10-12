@@ -1,9 +1,30 @@
-## Edge version
+## Egde version
+
+Nothing pushed yet
+
+## v0.11.0
+
+* Bugfix with remove_extra_files when only bower.json in root without Bowerfile [#175][]
+* Load Bowerfile from all gem dependencies before load by @gabealmer [#162][]
+* Make bower components directory configurable [#183][]
+* Shell-escape bower command to handle directories with spaces [#199][]
+* Return proper exit code on rake tasks when 'bower' is not installed [#200][]
+* Put url parameters outside of erb on paths resolve [#202][]
+
+[#162]: https://github.com/rharriso/bower-rails/pull/162
+[#175]: https://github.com/rharriso/bower-rails/pull/175
+[#183]: https://github.com/rharriso/bower-rails/pull/183
+[#199]: https://github.com/rharriso/bower-rails/pull/199
+[#200]: https://github.com/rharriso/bower-rails/pull/200
+[#202]: https://github.com/rharriso/bower-rails/pull/202
+
+## v0.10.0
 
 * add ability to configure bower to pass -F to bower install by @hubert [#129][]
-* add ability to append files into `main` directive  by @gacha [#117][]
+* add ability to append files into `main` directive  by @gacha [#137][]
 
 [#129]: https://github.com/42dev/bower-rails/pull/129
+[#137]: https://github.com/rharriso/bower-rails/pull/137
 
 ## v0.9.2
 

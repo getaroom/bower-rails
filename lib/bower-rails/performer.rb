@@ -15,8 +15,6 @@ module BowerRails
     end
 
     def perform(remove_components = true, &block)
-      entries = Dir.entries(root_path)
-
       npm_path = File.join(root_path, 'node_modules', '.bin')
       bower = find_command('bower', [npm_path])
 
@@ -24,7 +22,7 @@ module BowerRails
         $stderr.puts ["Bower not found! You can install Bower using Node and npm:",
         "$ npm install bower -g",
         "For more info see http://bower.io/"].join("\n")
-        return
+        exit 127
       end
 
       if entries.include?('Bowerfile')
@@ -68,9 +66,9 @@ module BowerRails
 
       # Load and merge root .bowerrc
       dot_bowerrc = JSON.parse(File.read(File.join(root_path, '.bowerrc'))) rescue {}
-      dot_bowerrc["directory"] = BowerRails.bower_components_directory
+      dot_bowerrc["directory"] = components_directory
 
-      if json.except('lib', 'vendor').empty?
+      if json.reject{ |key| ['lib', 'vendor'].include? key }.empty?
         folders = json.keys
       else
         raise "Assuming a standard bower package but cannot find the required 'name' key" unless !!json['name']
@@ -90,7 +88,7 @@ module BowerRails
         Dir.chdir(dir) do
 
           # Remove old components
-          FileUtils.rm_rf(BowerRails.bower_components_directory) if remove_components
+          FileUtils.rm_rf("#{components_directory}/*") if remove_components
 
           # Create bower.json
           File.open("bower.json", "w") do |f|
@@ -114,25 +112,26 @@ module BowerRails
       end
     end
 
-    def resolve_asset_paths
+    def resolve_asset_paths(root_directory = components_directory)
       # Resolve relative paths in CSS
-      Dir["#{BowerRails.bower_components_directory}/**/*.css"].each do |filename|
+      Dir["#{components_directory}/**/*.css"].each do |filename|
         contents = File.read(filename) if FileTest.file?(filename)
         # http://www.w3.org/TR/CSS2/syndata.html#uri
-        url_regex = /url\((?!\#)\s*['"]?(?![a-z]+:)([^'"\)]*)['"]?\s*\)/
+        url_regex = /url\((?!\#)\s*['"]?((?![a-z]+:)([^'"\)]*?)([?#][^'"\)]*)?)['"]?\s*\)/
 
         # Resolve paths in CSS file if it contains a url
         if contents =~ url_regex
           directory_path = Pathname.new(File.dirname(filename))
-          .relative_path_from(Pathname.new(BowerRails.bower_components_directory))
+          .relative_path_from(Pathname.new(root_directory))
 
           # Replace relative paths in URLs with Rails asset_path helper
           new_contents = contents.gsub(url_regex) do |match|
-            relative_path = $1
+            relative_path = $2
+            params = $3
             image_path = directory_path.join(relative_path).cleanpath
-            puts "#{match} => #{image_path}"
+            puts "#{match} => #{image_path} #{params}"
 
-            "url(<%= asset_path '#{image_path}' %>)"
+            "url(<%= asset_path '#{image_path}' %>#{params})"
           end
 
           # Replace CSS with ERB CSS file with resolved asset paths
@@ -145,7 +144,10 @@ module BowerRails
     def remove_extra_files
       puts "\nAttempting to remove all but main files as specified by bower\n"
 
-      Dir["#{BowerRails.bower_components_directory}/*"].each do |component_dir|
+      Dir["#{components_directory}/*"].each do |component_dir|
+        component_name = component_dir.split('/').last
+        next if clean_should_skip_component? component_name
+
         if File.exists?(File.join(component_dir, 'bower.json'))
           bower_file = File.read(File.join(component_dir, 'bower.json'))
         elsif File.exists?(File.join(component_dir, '.bower.json'))
@@ -156,7 +158,6 @@ module BowerRails
 
         # Parse bower.json
         bower_json = JSON.parse(bower_file)
-        component_name = component_dir.split('/').last
         main_files = Array(bower_json['main']) + main_files_for_component(component_name)
         next if main_files.empty?
 
@@ -185,7 +186,9 @@ module BowerRails
       paths.each do |path|
         exts.each do |ext|
           exe = File.join(path, "#{cmd}#{ext}")
-          return exe if (File.executable?(exe) && File.file?(exe))
+          if (File.executable?(exe) && File.file?(exe))
+            return Shellwords.escape exe
+          end
         end
       end
       nil
@@ -194,7 +197,21 @@ module BowerRails
     private
 
     def main_files_for_component(name)
+      return [] unless entries.include?('Bowerfile')
       Array(dsl.main_files[name])
+    end
+
+    def entries
+      @entries ||= Dir.entries(root_path)
+    end
+
+    def clean_should_skip_component?(name)
+      BowerRails.exclude_from_clean.respond_to?(:include?) &&
+        BowerRails.exclude_from_clean.include?(name)
+    end
+
+    def components_directory
+      BowerRails.bower_components_directory
     end
   end
 end
